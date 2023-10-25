@@ -8,7 +8,7 @@ from opustrainer.modifiers import Modifier
 from opustrainer.tokenizers import SpaceDetokenizer, SpaceTokenizer, MosesDetokenizer, SentencePieceTokenizer
 from opustrainer.modifiers.retokenize import Retokenizer, remap_alignment_pairs
 from opustrainer import logger
-
+from opustrainer.types import Tokenizer
 
 T = TypeVar('T')
 
@@ -244,6 +244,9 @@ class PlaceholderTagModifier(Modifier):
     src_retokenizer: Retokenizer
     trg_retokenizer: Retokenizer
 
+    src_tokenizer: Tokenizer
+    trg_tokenizer: Tokenizer
+
     modes: List[Tuple[str,float]]
 
     # Controls whether alignment info is printed. Normally this is controlled by
@@ -256,6 +259,9 @@ class PlaceholderTagModifier(Modifier):
         super().__init__(probability)
 
         self.template = template
+        # SentencePieceProcessor is stateful, so we should create a new tokenizer for each use case
+        self.src_tokenizer = SentencePieceTokenizer(spm_vocab) if spm_vocab else SpaceTokenizer()
+        self.trg_tokenizer = SentencePieceTokenizer(spm_vocab) if spm_vocab else SpaceTokenizer()
 
         self.src_retokenizer = Retokenizer(
             detokenizer=MosesDetokenizer(custom_detok_src) if custom_detok_src else SpaceDetokenizer(),
@@ -298,14 +304,14 @@ class PlaceholderTagModifier(Modifier):
         """
 
         src, trg, *rest = line.strip().split('\t')
-        source = src.split()
-        target = trg.split()
+        source, _ = self.src_tokenizer.tokenize(src)
+        target, _ = self.trg_tokenizer.tokenize(trg)
         alignments = []
         
         # Try parsing alignments. If we fail, the sentence will be thrown out
         # by the trainer.
         alignments = parse_alignments(rest[0], source, target)
-        candidate_offset = 0;
+        candidate_offset = 0
 
         while self.probability > 0.0:
             try:
