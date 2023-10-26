@@ -807,7 +807,8 @@ def main() -> None:
     parser.add_argument("--workers", '-j', type=int, default=os.cpu_count() or 1, help='Number of workers')
     parser.add_argument("--log-level", type=str, default="INFO", help="Set log level. Available levels: DEBUG, INFO, WARNING, ERROR, CRITICAL. Default is INFO")
     parser.add_argument("--log-file", '-l', type=str, default=None, help="Target location for logging. Always logs to stderr and optionally to a file.")
-    parser.add_argument("trainer", type=str, nargs=argparse.REMAINDER, help="Trainer program that gets fed the input. If empty it is read from config.")
+    parser.add_argument("trainer", type=str, default=None, nargs='?', help="Trainer program that gets fed the input. If empty it is read from config.")
+    parser.add_argument("args", type=str, nargs=argparse.REMAINDER, default=None, help="Trainer args")
 
     args = parser.parse_args()
     logger.setup_logger(args.log_file, args.log_level)
@@ -834,7 +835,7 @@ def main() -> None:
     signal.signal(signal.SIGUSR1, lambda signum, handler: print_state(trainer.state()))
 
     model_trainer = subprocess.Popen(
-        args.trainer or shlex.split(config['trainer']),
+        ([args.trainer] + args.args) if args.trainer else shlex.split(config['trainer']),
         stdin=subprocess.PIPE,
         encoding="utf-8",
         preexec_fn=ignore_sigint) # ignore_sigint makes marian ignore Ctrl-C. We'll stop it from here.
